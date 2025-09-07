@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Leaderboard TikTok Live</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        
+        body {
+            background: transparent;
+            color: white;
+            overflow: hidden;
+            width: 100vw;
+            height: 100vh;
+        }
+        
+        .container {
+            width: 100%;
+            height: 100%;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            background: rgba(0, 0, 0, 0.7);
+            border-radius: 15px;
+            box-shadow: 0 0 20px rgba(255, 46, 99, 0.5);
+        }
+        
+        .header {
+            text-align: center;
+            margin-bottom: 20px;
+            width: 100%;
+        }
+        
+        h1 {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+            color: #ff2e63;
+            text-shadow: 0 0 10px rgba(255, 46, 99, 0.8);
+        }
+        
+        .timer-container {
+            background: rgba(0, 0, 0, 0.5);
+            border: 2px solid #ff2e63;
+            border-radius: 10px;
+            padding: 15px;
+            margin-bottom: 20px;
+            width: 80%;
+            text-align: center;
+        }
+        
+        #timer {
+            font-size: 3rem;
+            font-weight: bold;
+            color: #ff2e63;
+            text-shadow: 0 0 10px rgba(255, 46, 99, 0.8);
+        }
+        
+        .controls {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+        
+        button {
+            background: #ff2e63;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: all 0.3s;
+        }
+        
+        button:hover {
+            background: #ff0a4c;
+            transform: scale(1.05);
+        }
+        
+        button:disabled {
+            background: #555;
+            cursor: not-allowed;
+        }
+        
+        .leaderboard {
+            width: 90%;
+            border-collapse: collapse;
+            margin-top: 10px;
+            background: rgba(0, 0, 0, 0.5);
+            border-radius: 10px;
+            overflow: hidden;
+        }
+        
+        .leaderboard th {
+            background: #ff2e63;
+            padding: 12px;
+            text-align: left;
+        }
+        
+        .leaderboard td {
+            padding: 12px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        
+        .leaderboard tr:last-child td {
+            border-bottom: none;
+        }
+        
+        .leaderboard tr:nth-child(even) {
+            background: rgba(255, 46, 99, 0.1);
+        }
+        
+        .position {
+            font-weight: bold;
+            text-align: center;
+            width: 50px;
+        }
+        
+        .amount {
+            text-align: right;
+            color: #ff2e63;
+            font-weight: bold;
+        }
+        
+        .no-donations {
+            text-align: center;
+            padding: 20px;
+            color: #aaa;
+        }
+        
+        .instructions {
+            margin-top: 20px;
+            text-align: center;
+            color: #aaa;
+            font-size: 0.9rem;
+            max-width: 80%;
+        }
+        
+        .highlight {
+            animation: highlight 2s ease;
+        }
+        
+        @keyframes highlight {
+            0% { background-color: rgba(255, 46, 99, 0.3); }
+            100% { background-color: transparent; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🎮 LEADERBOARD 🏆</h1>
+            <div class="timer-container">
+                <div id="timer">02:00</div>
+            </div>
+        </div>
+        
+        <div class="controls">
+            <button id="startBtn">Iniciar Contador</button>
+            <button id="resetBtn" disabled>Reiniciar</button>
+        </div>
+        
+        <table class="leaderboard">
+            <thead>
+                <tr>
+                    <th class="position">#</th>
+                    <th>Usuario</th>
+                    <th class="amount">Donación</th>
+                </tr>
+            </thead>
+            <tbody id="leaderboardBody">
+                <tr>
+                    <td colspan="3" class="no-donations">Esperando donaciones...</td>
+                </tr>
+            </tbody>
+        </table>
+        
+        <div class="instructions">
+            <p>Inicia el contador para comenzar a registrar donaciones. Solo se mostrarán las donaciones recibidas durante el período de 2 minutos.</p>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Elementos DOM
+            const timerDisplay = document.getElementById('timer');
+            const startBtn = document.getElementById('startBtn');
+            const resetBtn = document.getElementById('resetBtn');
+            const leaderboardBody = document.getElementById('leaderboardBody');
+            
+            // Variables de estado
+            let countdown = null;
+            let timeLeft = 2 * 60; // 2 minutos en segundos
+            let isActive = false;
+            let donations = [];
+            
+            // Formatear tiempo (mm:ss)
+            function formatTime(seconds) {
+                const mins = Math.floor(seconds / 60);
+                const secs = seconds % 60;
+                return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+            }
+            
+            // Actualizar display del temporizador
+            function updateTimerDisplay() {
+                timerDisplay.textContent = formatTime(timeLeft);
+            }
+            
+            // Iniciar el contador
+            function startTimer() {
+                if (isActive) return;
+                
+                isActive = true;
+                startBtn.disabled = true;
+                resetBtn.disabled = false;
+                
+                // Reiniciar donaciones
+                donations = [];
+                updateLeaderboard();
+                
+                countdown = setInterval(() => {
+                    timeLeft--;
+                    updateTimerDisplay();
+                    
+                    if (timeLeft <= 0) {
+                        clearInterval(countdown);
+                        isActive = false;
+                        startBtn.disabled = false;
+                        timerDisplay.textContent = "00:00";
+                    }
+                }, 1000);
+            }
+            
+            // Reiniciar el contador
+            function resetTimer() {
+                clearInterval(countdown);
+                isActive = false;
+                timeLeft = 2 * 60;
+                updateTimerDisplay();
+                startBtn.disabled = false;
+                resetBtn.disabled = true;
+                
+                // Limpiar donaciones
+                donations = [];
+                updateLeaderboard();
+            }
+            
+            // Simular recepción de donación (para pruebas)
+            function simulateDonation() {
+                if (!isActive) return;
+                
+                const users = ['Usuario1', 'Usuario2', 'Usuario3', 'Usuario4', 'Usuario5'];
+                const amounts = [5, 10, 15, 20, 25, 50, 100];
+                
+                const randomUser = users[Math.floor(Math.random() * users.length)];
+                const randomAmount = amounts[Math.floor(Math.random() * amounts.length)];
+                
+                addDonation(randomUser, randomAmount);
+            }
+            
+            // Añadir donación a la lista
+            function addDonation(username, amount) {
+                // Buscar si el usuario ya ha donado
+                const existingIndex = donations.findIndex(d => d.username === username);
+                
+                if (existingIndex !== -1) {
+                    // Actualizar donación existente
+                    donations[existingIndex].amount += amount;
+                } else {
+                    // Añadir nueva donación
+                    donations.push({
+                        username: username,
+                        amount: amount
+                    });
+                }
+                
+                // Ordenar por cantidad (descendente)
+                donations.sort((a, b) => b.amount - a.amount);
+                
+                updateLeaderboard();
+            }
+            
+            // Actualizar la tabla del leaderboard
+            function updateLeaderboard() {
+                if (donations.length === 0) {
+                    leaderboardBody.innerHTML = '<tr><td colspan="3" class="no-donations">Esperando donaciones...</td></tr>';
+                    return;
+                }
+                
+                let html = '';
+                donations.forEach((donation, index) => {
+                    html += `
+                        <tr class="${index < 3 ? 'top-donator' : ''}">
+                            <td class="position">${index + 1}</td>
+                            <td>${donation.username}</td>
+                            <td class="amount">$${donation.amount}</td>
+                        </tr>
+                    `;
+                });
+                
+                leaderboardBody.innerHTML = html;
+            }
+            
+            // Event Listeners
+            startBtn.addEventListener('click', startTimer);
+            resetBtn.addEventListener('click', resetTimer);
+            
+            // Simular donaciones aleatorias para pruebas (eliminar en producción)
+            setInterval(() => {
+                if (isActive && Math.random() > 0.7) {
+                    simulateDonation();
+                }
+            }, 5000);
+            
+            // Inicializar
+            updateTimerDisplay();
+            
+            // Para integración con TikTok: esta función debe ser llamada cuando llegue una donación real
+            window.handleDonation = function(username, amount) {
+                if (isActive) {
+                    addDonation(username, amount);
+                }
+            };
+        });
+    </script>
+</body>
+</html>
